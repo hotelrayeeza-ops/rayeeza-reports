@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#1a472a">
+<title>Rayeeza Reports</title>
+<!-- Reads the Rayeeza cloud copy (Supabase). Nothing shows without a login that an
+     owner has allowed: Supabase itself refuses the data to everyone else. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
+<style>
+  :root {
+    --primary: #1a472a; --primary-dark: #12341e; --primary-soft: #e9f2ec;
+    --accent: #c9a84c; --accent-soft: #faf3df;
+    --danger: #c0392b; --danger-soft: #fdecea; --success: #1e8449; --success-soft: #e6f4ea;
+    --warning: #b9650a; --warning-soft: #fff4e0;
+    --bg: #f2f4f3; --card: #fff; --border: #dde3df; --text: #18221c; --muted: #5d6b63;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, Roboto, Arial, sans-serif; background: var(--bg);
+         color: var(--text); font-size: 15px; line-height: 1.45; font-variant-numeric: tabular-nums;
+         -webkit-text-size-adjust: 100%; }
+  button, select, input { font: inherit; color: inherit; }
+  .hidden { display: none !important; }
+
+  header { position: sticky; top: 0; z-index: 10; background: linear-gradient(180deg, var(--primary), var(--primary-dark));
+           color: #fff; padding-top: env(safe-area-inset-top); box-shadow: 0 2px 10px rgba(0,0,0,.18); }
+  .bar { display: flex; align-items: center; gap: 10px; max-width: 980px; margin: 0 auto; padding: 10px 16px 8px; }
+  .mark { width: 34px; height: 34px; border-radius: 9px; background: var(--accent); color: var(--primary-dark);
+          display: inline-flex; align-items: center; justify-content: center; font-weight: 900; font-size: 18px; flex: none; }
+  .title { flex: 1; min-width: 0; }
+  .title b { display: block; font-size: 15px; letter-spacing: .5px; }
+  .title b span { color: var(--accent); }
+  .title small { display: block; font-size: 12px; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ghost { background: rgba(255,255,255,.1); color: #fff; border: 1px solid rgba(255,255,255,.5); border-radius: 8px;
+           padding: 6px 10px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  nav { display: flex; gap: 4px; max-width: 980px; margin: 0 auto; padding: 0 12px; overflow-x: auto; scrollbar-width: none; }
+  nav button { background: none; border: 0; color: rgba(255,255,255,.75); font-weight: 700; font-size: 14px;
+               padding: 9px 12px 10px; border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap; }
+  nav button.on { color: #fff; border-bottom-color: var(--accent); }
+
+  main { max-width: 980px; margin: 0 auto; padding: 14px 16px 48px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px;
+          margin-bottom: 14px; box-shadow: 0 1px 2px rgba(16,40,24,.06); }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--primary); margin-bottom: 10px;
+       display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  h2 small { text-transform: none; letter-spacing: 0; color: var(--muted); font-weight: 600; }
+
+  /* forms */
+  .login { max-width: 380px; margin: 8vh auto 0; }
+  .login h1 { font-size: 22px; color: var(--primary); text-align: center; margin: 10px 0 2px; }
+  .login p { text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 18px; }
+  .login .mark { width: 54px; height: 54px; font-size: 26px; border-radius: 14px; display: flex; margin: 0 auto; }
+  label { display: block; font-size: 12px; font-weight: 700; color: var(--muted); margin: 10px 0 4px; letter-spacing: .3px; }
+  input, select { width: 100%; padding: 11px 12px; border: 1px solid #c5cec8; border-radius: 10px; font-size: 16px; background: #fff; }
+  input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(201,168,76,.4); }
+  .btn { padding: 12px 16px; border: 0; border-radius: 10px; background: var(--primary); color: #fff; font-weight: 800;
+         font-size: 15px; cursor: pointer; }
+  .btn.full { width: 100%; margin-top: 16px; }
+  .btn.light { background: #fff; color: var(--primary); border: 1px solid #c5cec8; }
+  .btn.small { padding: 7px 11px; font-size: 13px; border-radius: 8px; }
+  .btn.red { background: #fff; color: var(--danger); border: 1px solid #f0c2bc; }
+  .btn:disabled { opacity: .6; }
+  .msg { margin-top: 12px; font-size: 14px; font-weight: 600; text-align: center; min-height: 20px; }
+  .msg.bad { color: var(--danger); } .msg.good { color: var(--success); }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .row > select, .row > input { flex: 1; min-width: 160px; width: auto; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+  @media (max-width: 520px) { .grid2 { grid-template-columns: 1fr; } }
+  .fresh { font-size: 13px; font-weight: 700; padding: 6px 10px; border-radius: 999px; background: var(--success-soft); color: #145c33; white-space: nowrap; }
+  .fresh.old { background: var(--warning-soft); color: var(--warning); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .chip { border: 1px solid #c5cec8; background: #fff; border-radius: 999px; padding: 5px 12px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .chip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+  /* figures */
+  .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+  @media (min-width: 640px) { .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .stat { border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: #fff; }
+  .stat .l { font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); font-weight: 700; }
+  .stat .v { font-size: 21px; font-weight: 900; color: var(--primary); margin-top: 2px; white-space: nowrap; }
+  .stat .s { font-size: 12px; color: var(--muted); }
+  .stat.red .v { color: var(--danger); }
+
+  /* tables */
+  .tw { overflow-x: auto; margin: 0 -4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted);
+       padding: 6px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 8px 6px; border-bottom: 1px solid #edf0ee; vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  @media (max-width: 430px) { table { font-size: 13px; } th, td { padding-left: 4px; padding-right: 4px; } }
+  .r { text-align: right; white-space: nowrap; } .c { text-align: center; } .b { font-weight: 800; } .nw { white-space: nowrap; }
+  .tot td { font-weight: 900; border-top: 2px solid var(--primary); }
+  .unpaid td { color: #9b2c22; font-weight: 700; background: var(--danger-soft); }
+  .tag { display: inline-block; font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px; text-transform: uppercase; white-space: nowrap; }
+  .tag.parcel { background: #dbe9ff; color: #0b3f8c; } .tag.dinein { background: #ece4fa; color: #4a2c80; }
+  .tag.cashier { background: #fff3cd; color: #664d03; } .tag.owner { background: var(--accent-soft); color: #7a5d12; }
+  .tag.viewer { background: var(--primary-soft); color: var(--primary); }
+  .tag.paid { background: var(--success-soft); color: #145c33; } .tag.pending { background: var(--danger-soft); color: #9b2c22; }
+  .empty { color: var(--muted); font-size: 14px; text-align: center; padding: 10px 0; }
+  .short { color: var(--danger); font-weight: 800; }
+  .bars .row2 { display: grid; grid-template-columns: 74px 1fr auto; gap: 8px; align-items: center; margin: 5px 0; font-size: 13px; }
+  .bars .track { height: 12px; background: #edf0ee; border-radius: 6px; overflow: hidden; }
+  .bars .fill { height: 100%; background: var(--primary); border-radius: 6px; }
+  .note { font-size: 12px; color: var(--muted); }
+  .loading { text-align: center; color: var(--muted); padding: 30px 0; }
+
+  /* bills list */
+  .bill { border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; background: #fff; overflow: hidden; }
+  .bill > button { width: 100%; display: grid; grid-template-columns: 62px 1fr auto; gap: 8px; align-items: center;
+                   text-align: left; background: none; border: 0; padding: 10px 12px; cursor: pointer; }
+  .bill.pending { border-color: #f0c2bc; } .bill.pending > button { background: var(--danger-soft); }
+  .bill .no { font-weight: 900; font-size: 18px; }
+  .bill .mid small { display: block; font-size: 12px; color: var(--muted); }
+  .bill .amt { font-weight: 900; text-align: right; white-space: nowrap; }
+  .bill .detail { padding: 0 12px 12px; font-size: 14px; border-top: 1px dashed var(--border); }
+  .bill .detail div { margin-top: 8px; }
+
+  /* people */
+  .person { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap;
+            padding: 10px 0; border-bottom: 1px solid #edf0ee; }
+  .person:last-child { border-bottom: 0; }
+  .person .who b { display: block; } .person .who small { color: var(--muted); font-size: 12px; }
+  .person .acts { display: flex; gap: 6px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<section id="login-view" class="hidden">
+  <main>
+    <div class="card login">
+      <span class="mark">R</span>
+      <h1>Rayeeza Reports</h1>
+      <p>Sales, items sold and cash, from the shop.</p>
+      <form id="login-form" autocomplete="on">
+        <label for="email">EMAIL</label>
+        <input id="email" type="email" autocomplete="username" required>
+        <label for="password">PASSWORD</label>
+        <input id="password" type="password" autocomplete="current-password" required>
+        <button class="btn full" id="login-btn" type="submit">Log in</button>
+        <div class="msg" id="login-msg" role="alert"></div>
+      </form>
+    </div>
+  </main>
+</section>
+
+<!-- Reports -->
+<section id="app-view" class="hidden">
+  <header>
+    <div class="bar">
+      <span class="mark">R</span>
+      <div class="title"><b>RAYEEZA <span>HOTEL</span></b><small id="who"></small></div>
+      <button class="ghost" id="refresh-btn" type="button" aria-label="Refresh">↻</button>
+      <button class="ghost" id="logout-btn" type="button">Log out</button>
+    </div>
+    <nav id="tabs">
+      <button type="button" data-tab="day" class="on">📊 Day</button>
+      <button type="button" data-tab="bills">🧾 Bills</button>
+      <button type="button" data-tab="compare">📈 Compare</button>
+      <button type="button" data-tab="owner" class="hidden" id="owner-tab">⚙️ Owner</button>
+    </nav>
+  </header>
+  <main>
+    <!-- the chosen day (Day and Bills tabs) -->
+    <div class="card" id="day-card">
+      <div class="row">
+        <select id="day" aria-label="Day"></select>
+        <span class="fresh" id="fresh"></span>
+      </div>
+    </div>
+
+    <div id="tab-day"><div class="loading">Loading…</div></div>
+
+    <div id="tab-bills" class="hidden">
+      <div class="card">
+        <input id="bill-search" type="search" placeholder="Search bill no., waiter, table…" aria-label="Search bills">
+        <div class="chips" id="bill-filters">
+          <button type="button" class="chip on" data-f="all">All</button>
+          <button type="button" class="chip" data-f="pending">Unpaid</button>
+          <button type="button" class="chip" data-f="paid">Paid</button>
+          <button type="button" class="chip" data-f="parcel">Parcel</button>
+          <button type="button" class="chip" data-f="dinein">Dine-in</button>
+          <button type="button" class="chip" data-f="cashier">Cashier KOT</button>
+        </div>
+      </div>
+      <div id="bill-list"></div>
+    </div>
+
+    <div id="tab-compare" class="hidden">
+      <div class="card">
+        <div class="chips" id="range-chips" style="margin-top:0">
+          <button type="button" class="chip on" data-n="7">Last 7 days</button>
+          <button type="button" class="chip" data-n="14">14 days</button>
+          <button type="button" class="chip" data-n="30">30 days</button>
+          <button type="button" class="chip" data-n="90">90 days</button>
+        </div>
+        <p class="note" style="margin-top:8px">Closed days only (each from one day end to the next).</p>
+      </div>
+      <div id="compare-body"><div class="loading">Loading…</div></div>
+    </div>
+
+    <div id="tab-owner" class="hidden">
+      <div class="card">
+        <h2>People who can log in <small>owners can add and remove people</small></h2>
+        <div id="people"><div class="loading">Loading…</div></div>
+      </div>
+      <div class="card">
+        <h2>Add a person</h2>
+        <form id="add-form" autocomplete="off">
+          <div class="grid2">
+            <div><label for="add-name">NAME</label><input id="add-name" maxlength="60" placeholder="e.g. Manager"></div>
+            <div><label for="add-email">EMAIL</label><input id="add-email" type="email" required></div>
+            <div><label for="add-pass">PASSWORD (at least 10 characters)</label><input id="add-pass" type="text" minlength="10" required autocomplete="new-password"></div>
+            <div><label for="add-role">CAN</label>
+              <select id="add-role"><option value="viewer">See reports</option><option value="owner">See reports + manage people (owner)</option></select></div>
+          </div>
+          <button class="btn full" type="submit" id="add-btn">Add person</button>
+          <div class="msg" id="add-msg" role="status"></div>
+        </form>
+        <p class="note" style="margin-top:8px">Give them the email and password yourself. They can log in straight away on this page.</p>
+      </div>
+      <div class="card">
+        <h2>Cashier PC</h2>
+        <div id="shop-health"><div class="loading">Loading…</div></div>
+      </div>
+    </div>
+  </main>
+</section>
+
+<script>
+// ── Settings: the project's public address and publishable key (safe to show:
+//    without an allowed login, Supabase returns no data) ───────────────────────
+const SUPABASE_URL = 'https://eaqyudvoxyfieefcnwgc.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Cdksp-yZl0ZYzacilcc39g__RaaU3rM';
+const SHOP_NAME    = 'Rayeeza Hotel';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const $  = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const rs  = n => 'Rs. ' + Number(n || 0).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// in table cells and bars: just the number (the column says Rs.), no .00 for whole rupees
+const nm  = n => Number(n || 0).toLocaleString('en-LK', { maximumFractionDigits: 2 });
+const COUNTER = { parcel: 'Parcel', dinein: 'Dine-in', cashier: 'Cashier KOT' };
+// Shop times are local 'YYYY-MM-DD HH:MM:SS'
+const time12 = s => { const m = String(s || '').match(/(\d+):(\d+)/); return m ? `${(+m[1] % 12) || 12}:${m[2]} ${+m[1] < 12 ? 'AM' : 'PM'}` : '—'; };
+const dateOf = s => { const d = new Date(String(s).replace(' ', 'T')); return isNaN(d) ? s : d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }); };
+const sum = (list, f = x => +x.amount) => list.reduce((t, x) => t + (+f(x) || 0), 0);
+const ago = iso => { if (!iso) return 'never'; const m = Math.round((Date.now() - new Date(iso)) / 60000);
+  return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
+
+let me = null, install = null, days = [], timer = null, tab = 'day', dayData = null, billFilter = 'all', rangeDays = 7;
+
+// ── Login / logout ─────────────────────────────────────────────────────────
+$('login-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = $('login-btn'), msg = $('login-msg');
+  btn.disabled = true; msg.className = 'msg'; msg.textContent = 'Logging in…';
+  const { error } = await sb.auth.signInWithPassword({ email: $('email').value.trim(), password: $('password').value });
+  btn.disabled = false;
+  if (error) { msg.className = 'msg bad'; msg.textContent = error.message === 'Invalid login credentials' ? 'Wrong email or password' : error.message; return; }
+  msg.textContent = '';
+  start();
+});
+$('logout-btn').addEventListener('click', async () => { clearInterval(timer); await sb.auth.signOut(); show('login'); });
+$('refresh-btn').addEventListener('click', () => refresh());
+$('day').addEventListener('change', () => loadDay());
+
+function show(view) {
+  $('login-view').classList.toggle('hidden', view !== 'login');
+  $('app-view').classList.toggle('hidden', view !== 'app');
+}
+
+async function start() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return show('login');
+  // Only allowed people get data; check, so others see a clear message
+  const { data: row } = await sb.from('viewers').select('email,name,role').maybeSingle();
+  if (!row) {
+    await sb.auth.signOut();
+    show('login');
+    $('login-msg').className = 'msg bad';
+    $('login-msg').textContent = 'This login is not allowed to see the reports. Ask an owner.';
+    return;
+  }
+  me = row;
+  $('who').textContent = `${me.name || me.email}${me.role === 'owner' ? ' · owner' : ''}`;
+  $('owner-tab').classList.toggle('hidden', me.role !== 'owner');
+  show('app');
+  await loadDays();
+  await loadDay();
+  clearInterval(timer);
+  timer = setInterval(() => { if (!document.hidden && $('day').value === 'open' && (tab === 'day' || tab === 'bills')) loadDay(); }, 60000);
+}
+
+function refresh() {
+  if (tab === 'compare') return loadCompare();
+  if (tab === 'owner') return loadOwner();
+  return loadDays().then(loadDay);
+}
+
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+$('tabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-tab]');
+  if (!b) return;
+  tab = b.dataset.tab;
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+  ['day', 'bills', 'compare', 'owner'].forEach(t => $('tab-' + t).classList.toggle('hidden', t !== tab));
+  $('day-card').classList.toggle('hidden', tab === 'compare' || tab === 'owner');
+  if (tab === 'compare') loadCompare();
+  if (tab === 'owner') loadOwner();
+  if (tab === 'bills') renderBills();
+});
+
+// ── Days: the open day + every closed day (newest first) ────────────────────
+async function loadDays() {
+  const { data: st } = await sb.from('sync_status').select('install_id').order('last_sync_at', { ascending: false }).limit(1);
+  install = st && st[0] ? st[0].install_id : null;
+  if (!install) { $('tab-day').innerHTML = '<div class="card empty">No data from the shop yet. Once the Cashier PC sends its first records they appear here.</div>'; return; }
+  const { data } = await sb.from('day_ends').select('id,closed_at,closed_by,summary').eq('install_id', install)
+    .order('closed_at', { ascending: false }).limit(1000);
+  days = data || [];
+  const keep = $('day').value;
+  $('day').innerHTML = '<option value="open">Today (open day)</option>' + days.map(d =>
+    `<option value="${d.id}">${dateOf(d.closed_at)} · closed ${time12(d.closed_at)}</option>`).join('');
+  if (keep && [...$('day').options].some(o => o.value === keep)) $('day').value = keep;
+}
+
+// A day as [from, to): from the previous day end up to this one
+function rangeOf(id) {
+  if (id === 'open') return { from: days[0] ? days[0].closed_at : null, to: null };
+  const i = days.findIndex(d => String(d.id) === String(id));
+  return { from: days[i + 1] ? days[i + 1].closed_at : null, to: days[i].closed_at };
+}
+
+// All rows of a table in [from, to), 1000 at a time (Supabase sends at most 1000 per request)
+async function fetchAll(table, from, to) {
+  const out = [];
+  for (let i = 0; ; i += 1000) {
+    let q = sb.from(table).select('*').eq('install_id', install).order('created_at').order('id').range(i, i + 999);
+    if (from) q = q.gte('created_at', from);
+    if (to)   q = q.lt('created_at', to);
+    const { data, error } = await q;
+    if (error) throw error;
+    out.push(...data);
+    if (data.length < 1000) return out;
+  }
+}
+async function fetchSet(from, to) {
+  const [bills, kots, petty, exps, counts, hands] = await Promise.all(
+    ['bills', 'kots', 'petty_cash', 'expenses', 'cash_counts', 'handovers'].map(t => fetchAll(t, from, to)));
+  return { bills, kots, petty, exps, counts, hands };
+}
+
+async function loadDay() {
+  if (!install) return;
+  const id = $('day').value, { from, to } = rangeOf(id);
+  try {
+    const [st, set] = await Promise.all([sb.from('sync_status').select('*').eq('install_id', install).maybeSingle(), fetchSet(from, to)]);
+    freshness(st.data);
+    dayData = { id, ...set };
+    renderDay();
+    if (tab === 'bills') renderBills();
+  } catch (e) { failed(e, 'tab-day'); }
+}
+
+async function failed(e, where) {
+  if (e && /JWT|token|expired/i.test(e.message || '')) { await sb.auth.signOut(); return show('login'); }
+  $(where).innerHTML = `<div class="card empty">Could not load: ${esc(e.message || e)}</div>`;
+}
+
+function freshness(st) {
+  const f = $('fresh');
+  if (!st) { f.textContent = ''; return; }
+  const mins = (Date.now() - new Date(st.last_sync_at)) / 60000;
+  f.textContent = mins < 2 ? `Live · ${time12(st.last_sync_local)}` : `Shop data as of ${time12(st.last_sync_local)}`;
+  f.className = 'fresh' + (mins >= 5 ? ' old' : '');
+  f.title = mins >= 5 ? 'The Cashier PC has not sent data for a while (switched off, or no internet)' : '';
+}
+
+// ── Shared helpers ───────────────────────────────────────────────────────────
+const card  = (title, body, side = '') => `<div class="card"><h2>${title}${side ? `<small>${side}</small>` : ''}</h2>${body}</div>`;
+const table = (head, body) => `<div class="tw"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+const none  = t => `<div class="empty">${t}</div>`;
+const live  = bills => bills.filter(b => b.status !== 'void');
+function itemsSold(kots, bills) {
+  const items = {};
+  const add = (i, kind) => { const x = items[i.name] || (items[i.name] = { name: i.name, kot: 0, nonkot: 0, total: 0 });
+                             x[kind] += +i.qty || 0; x.total += +i.total || 0; };
+  kots.forEach(k => (k.items || []).forEach(i => add(i, 'kot')));
+  live(bills).forEach(b => (b.nonkot_items || []).forEach(i => add(i, 'nonkot')));
+  return Object.values(items).sort((a, b) => b.total - a.total);
+}
+const expenseTotal = (petty, exps) => sum(petty) + sum(exps);
+function hourBars(bills) {
+  const hours = {};
+  live(bills).forEach(b => { const h = +String(b.created_at).slice(11, 13); hours[h] = (hours[h] || 0) + (+b.amount || 0); });
+  const hs = Object.keys(hours).map(Number).sort((a, b) => a - b), max = Math.max(1, ...Object.values(hours));
+  return hs.length ? `<div class="bars">${hs.map(h => `<div class="row2"><span>${(h % 12) || 12} ${h < 12 ? 'AM' : 'PM'}</span>
+    <div class="track"><div class="fill" style="width:${Math.round(hours[h] / max * 100)}%"></div></div><span class="b">${nm(hours[h])}</span></div>`).join('')}</div>` : '';
+}
+
+// ── Day tab ──────────────────────────────────────────────────────────────────
+function renderDay() {
+  const { bills, kots, petty, exps, counts, hands } = dayData;
+  const all = live(bills), paid = all.filter(b => b.status === 'paid'), unpaid = all.filter(b => b.status === 'pending');
+  const spent = expenseTotal(petty, exps);
+  let html = `<div class="stats">
+    <div class="stat"><div class="l">Sales</div><div class="v">${rs(sum(all))}</div><div class="s">${all.length} bills</div></div>
+    <div class="stat"><div class="l">Paid</div><div class="v">${rs(sum(paid))}</div><div class="s">${paid.length} bills</div></div>
+    <div class="stat${unpaid.length ? ' red' : ''}"><div class="l">Unpaid</div><div class="v">${rs(sum(unpaid))}</div><div class="s">${unpaid.length} bills</div></div>
+    <div class="stat"><div class="l">Expenses</div><div class="v">${rs(spent)}</div><div class="s">items, salary, other</div></div>
+  </div>`;
+
+  html += card('Sales by counter', table('<th>Counter</th><th class="c">Bills</th><th class="r">Sales Rs.</th><th class="r">Paid Rs.</th>',
+    ['parcel', 'dinein', 'cashier'].map(c => { const l = all.filter(b => b.counter === c);
+      return `<tr><td><span class="tag ${c}">${COUNTER[c]}</span></td><td class="c">${l.length}</td>
+        <td class="r">${nm(sum(l))}</td><td class="r">${nm(sum(l.filter(b => b.status === 'paid')))}</td></tr>`; }).join('') +
+    `<tr class="tot"><td>Total</td><td class="c">${all.length}</td><td class="r">${nm(sum(all))}</td><td class="r">${nm(sum(paid))}</td></tr>`),
+    `<button class="btn small light" type="button" onclick="downloadDay()">⬇ Excel</button>`);
+
+  html += card('Unpaid bills', unpaid.length ? table('<th>Bill</th><th>Counter</th><th>Waiter</th><th class="r">Amount Rs.</th><th class="r">Time</th>',
+    unpaid.map(b => `<tr class="unpaid"><td class="b">#${b.bill_number}</td><td>${COUNTER[b.counter] || b.counter}</td>
+      <td>${esc(b.waiter_name || '')}${b.table_no ? ' · T' + esc(b.table_no) : ''}</td><td class="r">${nm(b.amount)}</td><td class="r">${time12(b.created_at)}</td></tr>`).join(''))
+    : none('No unpaid bills ✓'), unpaid.length ? rs(sum(unpaid)) : '');
+
+  const sold = itemsSold(kots, bills);
+  html += card('Items sold', sold.length ? table('<th>Item</th><th class="c">KOT</th><th class="c">Non-KOT</th><th class="c">Total</th><th class="r">Amount Rs.</th>',
+    sold.map(i => `<tr><td>${esc(i.name)}</td><td class="c">${i.kot || '—'}</td><td class="c">${i.nonkot || '—'}</td>
+      <td class="c b">${i.kot + i.nonkot}</td><td class="r">${nm(i.total)}</td></tr>`).join(''))
+    : none('No KOT or Z items yet'), sold.length ? `${sold.reduce((t, i) => t + i.kot + i.nonkot, 0)} items` : '');
+
+  const hb = hourBars(bills);
+  if (hb) html += card('Sales by hour', hb);
+
+  const waiters = {};
+  all.filter(b => b.counter === 'dinein').forEach(b => { const k = b.waiter_name || b.waiter_no || '—';
+    const w = waiters[k] || (waiters[k] = { name: k, bills: 0, total: 0, unpaid: 0 }); w.bills++; w.total += +b.amount; if (b.status === 'pending') w.unpaid += +b.amount; });
+  const ws = Object.values(waiters).sort((a, b) => b.total - a.total);
+  if (ws.length) html += card('Dine-in by waiter', table('<th>Waiter</th><th class="c">Bills</th><th class="r">Sales Rs.</th><th class="r">Unpaid Rs.</th>',
+    ws.map(w => `<tr><td>${esc(w.name)}</td><td class="c">${w.bills}</td><td class="r">${nm(w.total)}</td><td class="r${w.unpaid ? ' short' : ''}">${w.unpaid ? nm(w.unpaid) : '—'}</td></tr>`).join('')));
+
+  html += card('Hourly cash counts', counts.length ? table('<th>Time</th><th>Cashier</th><th class="r">Counted Rs.</th>',
+    counts.map(c => `<tr><td class="nw">${time12(c.created_at)}</td><td>${esc(c.cashier || '')}${c.note ? ` <span class="note">${esc(c.note)}</span>` : ''}</td><td class="r b">${nm(c.amount)}</td></tr>`).join('') +
+    `<tr class="tot"><td colspan="2">Total counted</td><td class="r">${nm(sum(counts))}</td></tr>`) : none('No cash counts yet'));
+  if (hands.length) html += card('Cashier handovers', table('<th>Time</th><th>Took charge</th><th class="r">Drawer</th><th class="r">Change</th>',
+    hands.map(h => `<tr><td class="nw">${time12(h.created_at)}</td><td>${esc(h.cashier || '')}</td><td class="r">${nm(h.main_cash)}</td>
+      <td class="r${h.change_money != null && Math.abs(h.change_money - 50000) >= 0.01 ? ' short' : ''}">${h.change_money != null ? nm(h.change_money) : '—'}</td></tr>`).join('')),
+    'Rs. · change should be 50,000');
+
+  const exRows = expenseRows(petty, exps);
+  html += card('Expenses', exRows.length ? table('<th>Time</th><th>Type</th><th>What</th><th class="r">Amount Rs.</th>',
+    exRows.map(x => `<tr><td class="nw">${time12(x.t)}</td><td>${x.kind}</td><td>${esc(x.what)}</td><td class="r">${nm(x.amount)}</td></tr>`).join('') +
+    `<tr class="tot"><td colspan="3">Items ${rs(sum(petty.filter(p => p.type === 'product')))} · Salary ${rs(sum(petty.filter(p => p.type === 'salary')))}</td><td class="r">${nm(spent)}</td></tr>`) : none('No expenses'));
+
+  const openK = kots.filter(k => k.status === 'open');
+  if (openK.length) html += card('KOTs not billed yet', table('<th>KOT</th><th>Waiter</th><th>Items</th><th class="r">Amount Rs.</th>',
+    openK.map(k => `<tr class="unpaid"><td class="b">Q${k.kot_number}</td><td>${esc(k.waiter_name || '')}${k.table_no ? ' · T' + esc(k.table_no) : ''}</td>
+      <td>${(k.items || []).map(i => `${i.qty} × ${esc(i.name)}`).join(', ')}</td><td class="r">${nm(k.total)}</td></tr>`).join('')));
+
+  $('tab-day').innerHTML = html;
+}
+
+function expenseRows(petty, exps) {
+  return [...petty.map(p => ({ t: p.created_at, kind: p.type === 'product' ? 'Item' : p.type === 'salary' ? 'Salary' : 'Petty',
+                               what: p.name + (p.qty ? ' × ' + p.qty : ''), amount: +p.amount, by: p.entered_by })),
+          ...exps.map(x => ({ t: x.created_at, kind: 'Expense', what: `${x.category} — ${x.description}`, amount: +x.amount, by: x.entered_by }))]
+    .sort((a, b) => String(a.t).localeCompare(String(b.t)));
+}
+
+// ── Bills tab ────────────────────────────────────────────────────────────────
+$('bill-search').addEventListener('input', () => renderBills());
+$('bill-filters').addEventListener('click', e => {
+  const b = e.target.closest('[data-f]');
+  if (!b) return;
+  billFilter = b.dataset.f;
+  document.querySelectorAll('#bill-filters .chip').forEach(x => x.classList.toggle('on', x === b));
+  renderBills();
+});
+$('bill-list').addEventListener('click', e => {
+  const b = e.target.closest('.bill > button');
+  if (b) b.nextElementSibling.classList.toggle('hidden');
+});
+
+function renderBills() {
+  if (!dayData) return;
+  const q = $('bill-search').value.trim().toLowerCase().replace(/^#/, '');
+  const list = dayData.bills.slice().reverse().filter(b => {
+    if (['pending', 'paid'].includes(billFilter) && b.status !== billFilter) return false;
+    if (COUNTER[billFilter] && b.counter !== billFilter) return false;
+    if (!q) return true;
+    return String(b.bill_number) === q || [b.waiter_name, b.waiter_no, b.table_no && 't' + b.table_no, b.table_no, COUNTER[b.counter], b.note]
+      .some(v => v && String(v).toLowerCase().includes(q));
+  });
+  const kotsOf = id => dayData.kots.filter(k => String(k.bill_id) === String(id));
+  $('bill-list').innerHTML = list.length ? `<p class="note" style="margin:0 2px 8px">${list.length} bill${list.length === 1 ? '' : 's'} · ${rs(sum(live(list)))} · tap a bill for its items</p>` +
+    list.map(b => {
+      const k = kotsOf(b.id), z = b.nonkot_items || [];
+      return `<div class="bill ${b.status}">
+        <button type="button" aria-expanded="false"><span class="no">#${b.bill_number}</span>
+          <span class="mid"><span class="tag ${b.counter}">${COUNTER[b.counter] || b.counter}</span>
+            <small>${time12(b.created_at)}${b.waiter_name ? ' · ' + esc(b.waiter_name) : ''}${b.table_no ? ' · Table ' + esc(b.table_no) : ''}</small></span>
+          <span class="amt">${rs(b.amount)}<br><span class="tag ${b.status}">${b.status === 'pending' ? 'Unpaid' : b.status}</span></span></button>
+        <div class="detail hidden">
+          ${b.status === 'paid' ? `<div>Paid ${time12(b.paid_at)}${b.paid_by ? ' · marked by ' + esc(b.paid_by) : ''}</div>` : ''}
+          ${k.map(x => `<div><b>KOT Q${x.kot_number}</b> · ${(x.items || []).map(i => `${i.qty} × ${esc(i.name)}`).join(', ')} · ${rs(x.total)}</div>`).join('')}
+          ${z.length ? `<div><b>Non-KOT (Z)</b> · ${z.map(i => `${i.qty} × ${esc(i.name)}`).join(', ')} · ${rs(sum(z, i => i.total))}</div>` : ''}
+          ${!k.length && !z.length ? '<div class="note">Typed amount only (no items recorded)</div>' : ''}
+          ${b.note ? `<div class="note">Note: ${esc(b.note)}</div>` : ''}
+        </div></div>`;
+    }).join('') : '<div class="card empty">No bills match</div>';
+}
+
+// ── Compare tab: closed days side by side ───────────────────────────────────
+$('range-chips').addEventListener('click', e => {
+  const b = e.target.closest('[data-n]');
+  if (!b) return;
+  rangeDays = +b.dataset.n;
+  document.querySelectorAll('#range-chips .chip').forEach(x => x.classList.toggle('on', x === b));
+  loadCompare();
+});
+
+async function loadCompare() {
+  if (!install) return;
+  const el = $('compare-body');
+  const chosen = days.slice(0, rangeDays);               // newest first
+  if (!chosen.length) { el.innerHTML = '<div class="card empty">No closed days yet. Days appear here after the day-end code is used.</div>'; return; }
+  el.innerHTML = '<div class="loading">Loading…</div>';
+  try {
+    const oldest = days[chosen.length] ? days[chosen.length].closed_at : null;
+    const set = await fetchSet(oldest, chosen[0].closed_at);
+    // which closed day a time belongs to: the first day end after it
+    const asc = chosen.slice().reverse();
+    const dayOf = t => asc.find(d => String(t) < String(d.closed_at));
+    const per = new Map(asc.map(d => [d.id, { d, bills: [], kots: [], petty: [], exps: [] }]));
+    const put = (list, key) => list.forEach(r => { const d = dayOf(r.created_at); if (d) per.get(d.id)[key].push(r); });
+    put(set.bills, 'bills'); put(set.kots, 'kots'); put(set.petty, 'petty'); put(set.exps, 'exps');
+
+    const rowsD = [...per.values()].map(x => {
+      const all = live(x.bills), sold = itemsSold(x.kots, x.bills);
+      return { d: x.d, bills: all.length, sales: sum(all), paid: sum(all.filter(b => b.status === 'paid')),
+               unpaid: sum(all.filter(b => b.status === 'pending')), spent: expenseTotal(x.petty, x.exps),
+               items: sold.reduce((t, i) => t + i.kot + i.nonkot, 0) };
+    });
+    const max = Math.max(1, ...rowsD.map(r => r.sales)), T = k => rowsD.reduce((t, r) => t + r[k], 0);
+    let html = `<div class="stats">
+      <div class="stat"><div class="l">Sales</div><div class="v">${rs(T('sales'))}</div><div class="s">${rowsD.length} days</div></div>
+      <div class="stat"><div class="l">Average day</div><div class="v">${rs(T('sales') / rowsD.length)}</div><div class="s">sales per day</div></div>
+      <div class="stat"><div class="l">Expenses</div><div class="v">${rs(T('spent'))}</div><div class="s">all days</div></div>
+      <div class="stat"><div class="l">Items counted</div><div class="v">${T('items')}</div><div class="s">KOT + Non-KOT</div></div>
+    </div>`;
+    html += card('Sales per day', `<div class="bars">${rowsD.slice().reverse().map(r => `<div class="row2"><span>${dateOf(r.d.closed_at).replace(/^\w+ /, '')}</span>
+      <div class="track"><div class="fill" style="width:${Math.round(r.sales / max * 100)}%"></div></div><span class="b">${nm(r.sales)}</span></div>`).join('')}</div>`);
+    html += card('Day by day', table('<th>Day</th><th class="c">Bills</th><th class="r">Sales</th><th class="r">Unpaid</th><th class="r">Spent</th><th class="c">Qty</th>',
+      rowsD.slice().reverse().map(r => `<tr><td class="nw">${dateOf(r.d.closed_at).replace(/^\w+ /, '')}</td><td class="c">${r.bills}</td><td class="r">${nm(r.sales)}</td>
+        <td class="r${r.unpaid ? ' short' : ''}">${r.unpaid ? nm(r.unpaid) : '—'}</td><td class="r">${nm(r.spent)}</td><td class="c">${r.items}</td></tr>`).join('') +
+      `<tr class="tot"><td>Total</td><td class="c">${T('bills')}</td><td class="r">${nm(T('sales'))}</td><td class="r">${nm(T('unpaid'))}</td><td class="r">${nm(T('spent'))}</td><td class="c">${T('items')}</td></tr>`), 'amounts in Rs.');
+    const top = itemsSold(set.kots, set.bills).slice(0, 20);
+    if (top.length) html += card('Best-selling items', table('<th>Item</th><th class="c">Qty</th><th class="r">Amount Rs.</th>',
+      top.map(i => `<tr><td>${esc(i.name)}</td><td class="c b">${i.kot + i.nonkot}</td><td class="r">${nm(i.total)}</td></tr>`).join('')), 'top 20');
+    const hb = hourBars(set.bills);
+    if (hb) html += card('Busiest hours', hb, 'all days together');
+    el.innerHTML = html;
+  } catch (e) { failed(e, 'compare-body'); }
+}
+
+// ── Owner tab: people + Cashier PC health (through the owner-admin function) ─
+async function ownerCall(body) {
+  const { data, error } = await sb.functions.invoke('owner-admin', { body });
+  if (error) {
+    let msg = error.message;
+    try { const j = await error.context.json(); msg = j.message || msg; } catch (e) { /* not JSON */ }
+    return { success: false, message: msg };
+  }
+  return data;
+}
+
+async function loadOwner() {
+  if (me.role !== 'owner') return;
+  const res = await ownerCall({ action: 'list' });
+  if (!res.success) { $('people').innerHTML = none(esc(res.message)); return; }
+  $('people').innerHTML = res.people.map(p => `<div class="person">
+      <div class="who"><b>${esc(p.name || p.email)} <span class="tag ${p.role}">${p.role}</span>${p.email === res.me ? ' <span class="note">(you)</span>' : ''}</b>
+        <small>${esc(p.email)} · last login ${ago(p.last_login)}${p.has_login ? '' : ' · <span class="short">no login yet</span>'}</small></div>
+      <div class="acts">
+        <button class="btn small light" type="button" data-act="reset" data-email="${esc(p.email)}">New password</button>
+        <button class="btn small light" type="button" data-act="role" data-email="${esc(p.email)}" data-role="${p.role === 'owner' ? 'viewer' : 'owner'}">${p.role === 'owner' ? 'Make viewer' : 'Make owner'}</button>
+        ${p.email === res.me ? '' : `<button class="btn small red" type="button" data-act="remove" data-email="${esc(p.email)}">Remove</button>`}
+      </div></div>`).join('') || none('Nobody yet');
+
+  const s = res.sync[0];
+  $('shop-health').innerHTML = table('<th>What</th><th class="r">Status</th>',
+    `<tr><td>Last data received</td><td class="r b${!s || (Date.now() - new Date(s.last_sync_at)) > 300000 ? ' short' : ''}">${s ? ago(s.last_sync_at) : 'never'}</td></tr>
+     <tr><td>Shop time then</td><td class="r">${s ? esc(s.last_sync_local) : '—'}</td></tr>
+     <tr><td>App version on the PC</td><td class="r">${s ? esc(s.app_version || '—') : '—'}</td></tr>
+     ${res.shop_pcs.map(p => `<tr><td>PC login ${esc(p.email)}</td><td class="r">${p.has_login ? 'last login ' + ago(p.last_login) : '<span class="short">not created yet</span>'}</td></tr>`).join('')}`) +
+    `<p class="note" style="margin-top:8px">If "last data received" is more than a few minutes old during opening hours, the Cashier PC is off or has no internet. The shop keeps working; the data arrives when it reconnects.</p>`;
+}
+
+$('people').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-act]');
+  if (!b) return;
+  const email = b.dataset.email, act = b.dataset.act;
+  let body = { action: act, email };
+  if (act === 'reset') {
+    const pw = prompt(`New password for ${email} (at least 10 characters):`);
+    if (pw === null) return;
+    body.password = pw;
+  } else if (act === 'role') {
+    body.role = b.dataset.role;
+    if (!confirm(`${b.dataset.role === 'owner' ? 'Make' : 'Change'} ${email} ${b.dataset.role === 'owner' ? 'an owner (can manage people)' : 'a viewer (reports only)'}?`)) return;
+  } else if (act === 'remove') {
+    if (!confirm(`Remove ${email}? Their login is deleted and they can no longer see any reports.`)) return;
+  }
+  b.disabled = true;
+  const res = await ownerCall(body);
+  b.disabled = false;
+  if (!res.success) { alert(res.message); return; }
+  if (act === 'reset') alert(`Password changed. Give ${email} the new password.`);
+  loadOwner();
+});
+
+$('add-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = $('add-msg'), btn = $('add-btn');
+  btn.disabled = true; msg.className = 'msg'; msg.textContent = 'Adding…';
+  const res = await ownerCall({ action: 'add', name: $('add-name').value, email: $('add-email').value,
+                                password: $('add-pass').value, role: $('add-role').value });
+  btn.disabled = false;
+  if (!res.success) { msg.className = 'msg bad'; msg.textContent = res.message; return; }
+  msg.className = 'msg good';
+  msg.textContent = `${$('add-email').value.trim()} can now log in with that password.`;
+  e.target.reset();
+  loadOwner();
+});
+
+// ── Download the chosen day as an Excel file ────────────────────────────────
+function loadScript(src) {
+  return new Promise((ok, bad) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = bad; document.head.appendChild(s); });
+}
+async function downloadDay() {
+  if (!dayData) return;
+  if (!window.XLSX) {
+    try { await loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'); }
+    catch (e) { alert('Could not load the Excel maker. Check the internet and try again.'); return; }
+  }
+  const { bills, kots, petty, exps, counts, hands } = dayData, all = live(bills);
+  const label = dayData.id === 'open' ? 'open-day' : String(days.find(d => String(d.id) === String(dayData.id)).closed_at).slice(0, 10);
+  const wb = XLSX.utils.book_new();
+  const add = (name, rows) => XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.length ? rows : [{ '': 'Nothing' }]), name);
+  add('Summary', [
+    { What: 'Sales', Value: sum(all) }, { What: 'Bills', Value: all.length },
+    { What: 'Paid', Value: sum(all.filter(b => b.status === 'paid')) },
+    { What: 'Unpaid', Value: sum(all.filter(b => b.status === 'pending')) },
+    ...['parcel', 'dinein', 'cashier'].map(c => ({ What: COUNTER[c] + ' sales', Value: sum(all.filter(b => b.counter === c)) })),
+    { What: 'Expenses', Value: expenseTotal(petty, exps) }, { What: 'Cash counted', Value: sum(counts) }]);
+  add('Bills', bills.map(b => ({ 'Bill No': b.bill_number, Counter: COUNTER[b.counter] || b.counter, Waiter: b.waiter_name || '',
+    Table: b.table_no || '', Amount: +b.amount, Status: b.status === 'pending' ? 'Unpaid' : b.status, Printed: b.created_at,
+    'Paid at': b.paid_at || '', 'Paid by': b.paid_by || '', 'Non-KOT items': (b.nonkot_items || []).map(i => `${i.qty} x ${i.name}`).join(', ') })));
+  add('Items Sold', itemsSold(kots, bills).map(i => ({ Item: i.name, KOT: i.kot, 'Non-KOT': i.nonkot, Total: i.kot + i.nonkot, Amount: i.total })));
+  add('KOTs', kots.map(k => ({ KOT: 'Q' + k.kot_number, Counter: COUNTER[k.counter] || k.counter, Waiter: k.waiter_name || '', Table: k.table_no || '',
+    Items: (k.items || []).map(i => `${i.qty} x ${i.name}`).join(', '), Total: +k.total, Status: k.status, Time: k.created_at })));
+  add('Cash Counts', counts.map(c => ({ Time: c.created_at, Cashier: c.cashier || '', Counted: +c.amount, Note: c.note || '' })));
+  add('Handovers', hands.map(h => ({ Time: h.created_at, 'Took charge': h.cashier || '', 'Main cash': +h.main_cash, 'Change money': h.change_money == null ? '' : +h.change_money, Note: h.note || '' })));
+  add('Expenses', expenseRows(petty, exps).map(x => ({ Time: x.t, Type: x.kind, What: x.what, Amount: x.amount, By: x.by || '' })));
+  XLSX.writeFile(wb, `rayeeza-${label}.xlsx`);
+}
+
+// ── Go ───────────────────────────────────────────────────────────────────────
+sb.auth.onAuthStateChange(ev => { if (ev === 'SIGNED_OUT') { clearInterval(timer); show('login'); } });
+start();
+</script>
+</body>
+</html>
